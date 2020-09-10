@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css">
+    <style>
+           .list-group-item.list-group-item.active > .text-muted {
+            color: rgba(255, 255, 255,.85) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-3">
+        <div id=app>
+            <div class="row">
+                <div class="col-lg-4">
+                    <h3>Proveedores</h3>
+                    <div class="list-group list-group-flush">
+                        <div 
+                            v-for="proveedor in proveedores" 
+                            :key="proveedor.dni" 
+                            class="list-group-item list-group-item-action"
+                        >
+                            <strong><span class="text-capitalize">{{ `${proveedor.name} ${proveedor.lastName}` }}</span></strong>
+                            <div class="text-muted">
+                                <small>DNI: {{ proveedor.dni }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr>
+            <div class="row" v-if="rubros">
+                <div class="col-12">
+                    <h5><strong>Convocatoria, Ingrese Dni para verificar si cumple </strong></h5>
+                </div>
+                <div class="col-lg-4">
+                    <div class="form-group">
+                        <label class="mb-0" for="">Rubro</label>
+                        <select class="form-control" v-model="rubroProveedor">
+                            <option v-for="rubro in rubros" :key="rubro" :value="rubro">{{ rubro.toUpperCase() }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="form-group">
+                        <label class="mb-0" for="">DNI</label>
+                        <div class="input-group">
+                            <input 
+                                v-model="dniProveedor" 
+                                type="number" 
+                                class="form-control" 
+                                placeholder="DNI" 
+                                @keyup.enter="onClickBuscarProveedor">
+
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-primary" @click="onClickBuscarProveedor">
+                                    <span class="fa fa-fw fa-search"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4" v-if="proveedor">
+                    <div>
+                        <strong>
+                            <span class="text-capitalize">{{ `${proveedor.name} ${proveedor.lastName}` }}</span>
+                        </strong>
+                        <p class="text-muted mb-1">
+                            <small>DNI: {{ proveedor.dni }}</small>
+                        </p>
+                        <p class="text-muted mb-1">
+                            <small>RUBRO: {{ (proveedor.rubro || '').toUpperCase() }}</small>
+                        </p>
+                        <p class="text-muted mb-1">
+                            <small>APTO: {{ proveedor.sancion ? 'NO' : 'SI' }}</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script>
+        new Vue({
+            el: "#app",
+            data: {
+                proveedores: [],
+                cursoSeleccionado: null,
+                dniProveedor: '',
+                rubroProveedor: '',
+                proveedor: null,
+                rubros: null
+            },
+            created: function () {
+                let vm = this
+
+                axios.get('https://servicioexamen.herokuapp.com/api/v1/score/prov/')
+                .then(function (response) {
+                    let data = response.data.content
+                    let rubros = data.map(item => item.rubro)
+
+                    rubros = [...new Set(rubros)];
+
+                    console.log(rubros);
+
+                    vm.rubros = rubros
+                    vm.proveedores = data
+                })
+            },
+            methods: {
+                onClickCurso: function (pCurso) {
+                    let vm = this
+
+                    vm.estudiantes = null
+                    vm.cursoSeleccionado = pCurso
+
+                    axios.get(`https://api-dicda.herokuapp.com/api/v1/score/course/${pCurso.id}/student`)
+                    .then(function (response) {
+                        vm.estudiantes = response.data.content.students
+                    })
+                },
+                onClickBuscarProveedor: function () {
+                    let vm = this
+                    let dniProveedor = String(vm.dniProveedor).trim()
+
+                    if (dniProveedor == '' || vm.rubroProveedor == '') {
+                        return alert('Completa los campos')
+                    }
+                    
+                    axios.get(`https://servicioexamen.herokuapp.com/api/v1/score/prov/dni/${dniProveedor}`)
+                    .then(function (response) {
+
+                        let proveedor = response.data.content
+
+                        proveedor.sancion = proveedor.sancion ? true : !(proveedor.rubro == vm.rubroProveedor)
+
+                        vm.proveedor = proveedor
+                    })
+                    .catch(function (error) {
+                        alert('DNI no existente en nuestros registros')
+                    })
+
+                },
+            }
+        })
+    </script>
+</body>
+</html>
